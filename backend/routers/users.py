@@ -24,7 +24,7 @@ def register(user_data: schemas.UserRegister, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
-    token = create_access_token({"sub": user.id})
+    token = create_access_token({"sub": str(user.id)})
     return {"access_token": token, "token_type": "bearer", "user": {
         "id": user.id, "username": user.username, "email": user.email, "role": user.role
     }}
@@ -38,7 +38,7 @@ def login(credentials: schemas.UserLogin, db: Session = Depends(get_db)):
     if not user.is_active:
         raise HTTPException(status_code=403, detail="账号已被禁用")
 
-    token = create_access_token({"sub": user.id})
+    token = create_access_token({"sub": str(user.id)})
     return {"access_token": token, "token_type": "bearer", "user": {
         "id": user.id, "username": user.username, "email": user.email,
         "role": user.role, "avatar": user.avatar, "phone": user.phone
