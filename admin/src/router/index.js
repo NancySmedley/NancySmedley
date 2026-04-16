@@ -12,9 +12,11 @@ const routes = [
       { path: 'dashboard', component: () => import('@/views/Dashboard.vue') },
       { path: 'products', component: () => import('@/views/Products.vue') },
       { path: 'categories', component: () => import('@/views/Categories.vue') },
-      { path: 'orders', component: () => import('@/views/Orders.vue') },
-      { path: 'users', component: () => import('@/views/Users.vue') },
       { path: 'banners', component: () => import('@/views/Banners.vue') },
+      { path: 'downloads', component: () => import('@/views/Downloads.vue') },
+      { path: 'manuals', component: () => import('@/views/Manuals.vue') },
+      { path: 'pages', component: () => import('@/views/Pages.vue') },
+      { path: 'users', component: () => import('@/views/Users.vue') },
     ]
   },
   { path: '/:pathMatch(.*)*', redirect: '/admin' }

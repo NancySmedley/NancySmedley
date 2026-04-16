@@ -1,21 +1,7 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
-import enum
-
-
-class UserRole(str, enum.Enum):
-    user = "user"
-    admin = "admin"
-
-
-class OrderStatus(str, enum.Enum):
-    pending = "pending"
-    paid = "paid"
-    shipped = "shipped"
-    delivered = "delivered"
-    cancelled = "cancelled"
 
 
 class User(Base):
@@ -30,10 +16,6 @@ class User(Base):
     role = Column(String(10), default="user")
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    cart_items = relationship("CartItem", back_populates="user", cascade="all, delete-orphan")
-    orders = relationship("Order", back_populates="user")
-    addresses = relationship("Address", back_populates="user", cascade="all, delete-orphan")
 
 
 class Category(Base):
@@ -55,87 +37,24 @@ class Product(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(200), nullable=False)
+    short_desc = Column(String(300))          # 短描述，用于首页展示
     description = Column(Text)
-    price = Column(Float, nullable=False)
-    original_price = Column(Float)
-    stock = Column(Integer, default=0)
-    sales = Column(Integer, default=0)
     cover_image = Column(String(300))
-    images = Column(Text)  # JSON array of image URLs
-    specs = Column(Text)   # JSON object of specifications
+    images = Column(Text)                     # JSON 图片列表
+    colors = Column(String(300))              # JSON 颜色点列表，如 ["#fff","#000"]
+    specs = Column(Text)                      # JSON 规格
+    external_link = Column(String(500))       # 外部购买链接（天猫/京东）
+    series = Column(String(50))              # 系列，如"蓝牙系列"，用于分类Tab
     category_id = Column(Integer, ForeignKey("categories.id"))
     is_active = Column(Boolean, default=True)
-    is_featured = Column(Boolean, default=False)
+    is_featured = Column(Boolean, default=False)   # 主销爆款
+    is_lifestyle = Column(Boolean, default=False)  # 为运动而生板块
+    is_fashion = Column(Boolean, default=False)    # 穿搭好物板块
     sort_order = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     category = relationship("Category", back_populates="products")
-    cart_items = relationship("CartItem", back_populates="product")
-    order_items = relationship("OrderItem", back_populates="product")
-
-
-class CartItem(Base):
-    __tablename__ = "cart_items"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    quantity = Column(Integer, default=1)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    user = relationship("User", back_populates="cart_items")
-    product = relationship("Product", back_populates="cart_items")
-
-
-class Address(Base):
-    __tablename__ = "addresses"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    name = Column(String(50), nullable=False)
-    phone = Column(String(20), nullable=False)
-    province = Column(String(50))
-    city = Column(String(50))
-    district = Column(String(50))
-    detail = Column(String(200))
-    is_default = Column(Boolean, default=False)
-
-    user = relationship("User", back_populates="addresses")
-    orders = relationship("Order", back_populates="address")
-
-
-class Order(Base):
-    __tablename__ = "orders"
-
-    id = Column(Integer, primary_key=True, index=True)
-    order_no = Column(String(50), unique=True, nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    address_id = Column(Integer, ForeignKey("addresses.id"))
-    total_amount = Column(Float, nullable=False)
-    status = Column(String(20), default="pending")
-    remark = Column(String(300))
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-    user = relationship("User", back_populates="orders")
-    address = relationship("Address", back_populates="orders")
-    items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
-
-
-class OrderItem(Base):
-    __tablename__ = "order_items"
-
-    id = Column(Integer, primary_key=True, index=True)
-    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
-    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    product_name = Column(String(200))
-    product_image = Column(String(300))
-    price = Column(Float, nullable=False)
-    quantity = Column(Integer, nullable=False)
-
-    order = relationship("Order", back_populates="items")
-    product = relationship("Product", back_populates="order_items")
 
 
 class Banner(Base):
@@ -143,8 +62,56 @@ class Banner(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(100))
+    subtitle = Column(String(200))            # 副标题
+    features = Column(String(500))           # 特性列表，JSON
     image = Column(String(300), nullable=False)
+    bg_color = Column(String(20), default="#1a1a2e")  # 背景色
+    btn_text = Column(String(50), default="立即购买")
     link = Column(String(300))
     sort_order = Column(Integer, default=0)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class Download(Base):
+    """软件下载"""
+    __tablename__ = "downloads"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False)      # 软件名称
+    description = Column(Text)
+    version = Column(String(50))
+    cover_image = Column(String(300))
+    ios_url = Column(String(500))
+    android_url = Column(String(500))
+    windows_url = Column(String(500))
+    mac_url = Column(String(500))
+    sort_order = Column(Integer, default=0)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class Manual(Base):
+    """产品说明书"""
+    __tablename__ = "manuals"
+
+    id = Column(Integer, primary_key=True, index=True)
+    product_name = Column(String(200), nullable=False)
+    cover_image = Column(String(300))
+    file_url = Column(String(500))             # PDF 下载链接
+    description = Column(String(300))
+    sort_order = Column(Integer, default=0)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class PageContent(Base):
+    """页面内容（品牌文化、关于我们等静态页）"""
+    __tablename__ = "page_contents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    page_key = Column(String(50), unique=True, nullable=False)  # brand / about / cooperation
+    title = Column(String(200))
+    content = Column(Text)                    # HTML 富文本
+    images = Column(Text)                     # JSON 图片列表
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())

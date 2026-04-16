@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 from typing import Optional
 import os, uuid, aiofiles
 from database import get_db
@@ -8,46 +7,27 @@ from auth import get_current_admin
 import models, schemas
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
-
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 # --- Dashboard ---
-@router.get("/stats", response_model=schemas.DashboardStats)
+@router.get("/stats")
 def get_stats(db: Session = Depends(get_db), admin=Depends(get_current_admin)):
-    total_users = db.query(models.User).filter(models.User.role == "user").count()
-    total_products = db.query(models.Product).count()
-    total_orders = db.query(models.Order).count()
-    total_revenue = db.query(func.sum(models.Order.total_amount)).filter(
-        models.Order.status.in_(["paid", "shipped", "delivered"])
-    ).scalar() or 0.0
-
-    recent_orders = db.query(models.Order).order_by(
-        models.Order.created_at.desc()
-    ).limit(10).all()
-
     return {
-        "total_users": total_users,
-        "total_products": total_products,
-        "total_orders": total_orders,
-        "total_revenue": round(total_revenue, 2),
-        "recent_orders": [
-            {
-                "id": o.id, "order_no": o.order_no,
-                "total_amount": o.total_amount, "status": o.status,
-                "created_at": o.created_at.isoformat()
-            } for o in recent_orders
-        ]
+        "total_products": db.query(models.Product).count(),
+        "total_downloads": db.query(models.Download).count(),
+        "total_manuals": db.query(models.Manual).count(),
+        "total_users": db.query(models.User).filter(models.User.role == "user").count(),
     }
 
 
-# --- File Upload ---
+# --- Upload ---
 @router.post("/upload")
 async def upload_file(file: UploadFile = File(...), admin=Depends(get_current_admin)):
     ext = os.path.splitext(file.filename)[1].lower()
-    if ext not in [".jpg", ".jpeg", ".png", ".gif", ".webp"]:
-        raise HTTPException(status_code=400, detail="只支持图片格式")
+    if ext not in [".jpg", ".jpeg", ".png", ".gif", ".webp", ".pdf"]:
+        raise HTTPException(status_code=400, detail="不支持的文件格式")
     filename = f"{uuid.uuid4().hex}{ext}"
     filepath = os.path.join(UPLOAD_DIR, filename)
     async with aiofiles.open(filepath, "wb") as f:
@@ -59,65 +39,42 @@ async def upload_file(file: UploadFile = File(...), admin=Depends(get_current_ad
 # --- Products ---
 @router.get("/products")
 def admin_list_products(
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    keyword: Optional[str] = None,
-    category_id: Optional[int] = None,
-    db: Session = Depends(get_db),
-    admin=Depends(get_current_admin)
+    page: int = Query(1, ge=1), page_size: int = Query(20),
+    keyword: Optional[str] = None, series: Optional[str] = None,
+    db: Session = Depends(get_db), admin=Depends(get_current_admin)
 ):
     query = db.query(models.Product)
     if keyword:
         query = query.filter(models.Product.name.contains(keyword))
-    if category_id:
-        query = query.filter(models.Product.category_id == category_id)
+    if series:
+        query = query.filter(models.Product.series == series)
     total = query.count()
-    products = query.order_by(models.Product.created_at.desc()) \
-                    .offset((page - 1) * page_size).limit(page_size).all()
-    return {"total": total, "items": products}
+    items = query.order_by(models.Product.created_at.desc()).offset((page-1)*page_size).limit(page_size).all()
+    return {"total": total, "items": items}
 
 
 @router.post("/products", response_model=schemas.ProductOut)
-def admin_create_product(
-    product: schemas.ProductCreate,
-    db: Session = Depends(get_db),
-    admin=Depends(get_current_admin)
-):
-    db_product = models.Product(**product.model_dump())
-    db.add(db_product)
-    db.commit()
-    db.refresh(db_product)
-    return db_product
+def admin_create_product(product: schemas.ProductCreate, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    db_p = models.Product(**product.model_dump())
+    db.add(db_p); db.commit(); db.refresh(db_p)
+    return db_p
 
 
-@router.put("/products/{product_id}", response_model=schemas.ProductOut)
-def admin_update_product(
-    product_id: int,
-    product: schemas.ProductUpdate,
-    db: Session = Depends(get_db),
-    admin=Depends(get_current_admin)
-):
-    db_product = db.query(models.Product).filter(models.Product.id == product_id).first()
-    if not db_product:
-        raise HTTPException(status_code=404, detail="产品不存在")
-    for key, val in product.model_dump(exclude_none=True).items():
-        setattr(db_product, key, val)
-    db.commit()
-    db.refresh(db_product)
-    return db_product
+@router.put("/products/{pid}", response_model=schemas.ProductOut)
+def admin_update_product(pid: int, product: schemas.ProductUpdate, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    db_p = db.query(models.Product).filter(models.Product.id == pid).first()
+    if not db_p: raise HTTPException(404, "产品不存在")
+    for k, v in product.model_dump(exclude_none=True).items():
+        setattr(db_p, k, v)
+    db.commit(); db.refresh(db_p)
+    return db_p
 
 
-@router.delete("/products/{product_id}")
-def admin_delete_product(
-    product_id: int,
-    db: Session = Depends(get_db),
-    admin=Depends(get_current_admin)
-):
-    db_product = db.query(models.Product).filter(models.Product.id == product_id).first()
-    if not db_product:
-        raise HTTPException(status_code=404, detail="产品不存在")
-    db.delete(db_product)
-    db.commit()
+@router.delete("/products/{pid}")
+def admin_delete_product(pid: int, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    db_p = db.query(models.Product).filter(models.Product.id == pid).first()
+    if not db_p: raise HTTPException(404, "产品不存在")
+    db.delete(db_p); db.commit()
     return {"message": "删除成功"}
 
 
@@ -128,117 +85,28 @@ def admin_list_categories(db: Session = Depends(get_db), admin=Depends(get_curre
 
 
 @router.post("/categories", response_model=schemas.CategoryOut)
-def admin_create_category(
-    category: schemas.CategoryCreate,
-    db: Session = Depends(get_db),
-    admin=Depends(get_current_admin)
-):
-    if db.query(models.Category).filter(models.Category.name == category.name).first():
-        raise HTTPException(status_code=400, detail="分类名称已存在")
-    db_cat = models.Category(**category.model_dump())
-    db.add(db_cat)
-    db.commit()
-    db.refresh(db_cat)
-    return db_cat
+def admin_create_category(category: schemas.CategoryCreate, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    db_c = models.Category(**category.model_dump())
+    db.add(db_c); db.commit(); db.refresh(db_c)
+    return db_c
 
 
-@router.put("/categories/{cat_id}", response_model=schemas.CategoryOut)
-def admin_update_category(
-    cat_id: int,
-    category: schemas.CategoryCreate,
-    db: Session = Depends(get_db),
-    admin=Depends(get_current_admin)
-):
-    db_cat = db.query(models.Category).filter(models.Category.id == cat_id).first()
-    if not db_cat:
-        raise HTTPException(status_code=404, detail="分类不存在")
-    for key, val in category.model_dump().items():
-        setattr(db_cat, key, val)
-    db.commit()
-    db.refresh(db_cat)
-    return db_cat
+@router.put("/categories/{cid}", response_model=schemas.CategoryOut)
+def admin_update_category(cid: int, category: schemas.CategoryCreate, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    db_c = db.query(models.Category).filter(models.Category.id == cid).first()
+    if not db_c: raise HTTPException(404, "分类不存在")
+    for k, v in category.model_dump().items():
+        setattr(db_c, k, v)
+    db.commit(); db.refresh(db_c)
+    return db_c
 
 
-@router.delete("/categories/{cat_id}")
-def admin_delete_category(
-    cat_id: int,
-    db: Session = Depends(get_db),
-    admin=Depends(get_current_admin)
-):
-    db_cat = db.query(models.Category).filter(models.Category.id == cat_id).first()
-    if not db_cat:
-        raise HTTPException(status_code=404, detail="分类不存在")
-    db.delete(db_cat)
-    db.commit()
+@router.delete("/categories/{cid}")
+def admin_delete_category(cid: int, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    db_c = db.query(models.Category).filter(models.Category.id == cid).first()
+    if not db_c: raise HTTPException(404, "分类不存在")
+    db.delete(db_c); db.commit()
     return {"message": "删除成功"}
-
-
-# --- Orders ---
-@router.get("/orders")
-def admin_list_orders(
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    status: Optional[str] = None,
-    db: Session = Depends(get_db),
-    admin=Depends(get_current_admin)
-):
-    query = db.query(models.Order)
-    if status:
-        query = query.filter(models.Order.status == status)
-    total = query.count()
-    orders = query.order_by(models.Order.created_at.desc()) \
-                  .offset((page - 1) * page_size).limit(page_size).all()
-    return {"total": total, "items": orders}
-
-
-@router.put("/orders/{order_id}/status")
-def admin_update_order_status(
-    order_id: int,
-    data: dict,
-    db: Session = Depends(get_db),
-    admin=Depends(get_current_admin)
-):
-    order = db.query(models.Order).filter(models.Order.id == order_id).first()
-    if not order:
-        raise HTTPException(status_code=404, detail="订单不存在")
-    order.status = data.get("status", order.status)
-    db.commit()
-    return {"message": "状态更新成功"}
-
-
-# --- Users ---
-@router.get("/users")
-def admin_list_users(
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    keyword: Optional[str] = None,
-    db: Session = Depends(get_db),
-    admin=Depends(get_current_admin)
-):
-    query = db.query(models.User).filter(models.User.role == "user")
-    if keyword:
-        query = query.filter(
-            models.User.username.contains(keyword) | models.User.email.contains(keyword)
-        )
-    total = query.count()
-    users = query.order_by(models.User.created_at.desc()) \
-                 .offset((page - 1) * page_size).limit(page_size).all()
-    return {"total": total, "items": users}
-
-
-@router.put("/users/{user_id}/status")
-def admin_toggle_user(
-    user_id: int,
-    data: dict,
-    db: Session = Depends(get_db),
-    admin=Depends(get_current_admin)
-):
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="用户不存在")
-    user.is_active = data.get("is_active", user.is_active)
-    db.commit()
-    return {"message": "用户状态已更新"}
 
 
 # --- Banners ---
@@ -248,44 +116,131 @@ def admin_list_banners(db: Session = Depends(get_db), admin=Depends(get_current_
 
 
 @router.post("/banners", response_model=schemas.BannerOut)
-def admin_create_banner(
-    banner: schemas.BannerCreate,
-    db: Session = Depends(get_db),
-    admin=Depends(get_current_admin)
-):
-    db_banner = models.Banner(**banner.model_dump())
-    db.add(db_banner)
-    db.commit()
-    db.refresh(db_banner)
-    return db_banner
+def admin_create_banner(banner: schemas.BannerCreate, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    db_b = models.Banner(**banner.model_dump())
+    db.add(db_b); db.commit(); db.refresh(db_b)
+    return db_b
 
 
-@router.put("/banners/{banner_id}", response_model=schemas.BannerOut)
-def admin_update_banner(
-    banner_id: int,
-    banner: schemas.BannerCreate,
-    db: Session = Depends(get_db),
-    admin=Depends(get_current_admin)
-):
-    db_banner = db.query(models.Banner).filter(models.Banner.id == banner_id).first()
-    if not db_banner:
-        raise HTTPException(status_code=404, detail="轮播图不存在")
-    for key, val in banner.model_dump().items():
-        setattr(db_banner, key, val)
-    db.commit()
-    db.refresh(db_banner)
-    return db_banner
+@router.put("/banners/{bid}", response_model=schemas.BannerOut)
+def admin_update_banner(bid: int, banner: schemas.BannerCreate, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    db_b = db.query(models.Banner).filter(models.Banner.id == bid).first()
+    if not db_b: raise HTTPException(404, "轮播图不存在")
+    for k, v in banner.model_dump().items():
+        setattr(db_b, k, v)
+    db.commit(); db.refresh(db_b)
+    return db_b
 
 
-@router.delete("/banners/{banner_id}")
-def admin_delete_banner(
-    banner_id: int,
-    db: Session = Depends(get_db),
-    admin=Depends(get_current_admin)
-):
-    db_banner = db.query(models.Banner).filter(models.Banner.id == banner_id).first()
-    if not db_banner:
-        raise HTTPException(status_code=404, detail="轮播图不存在")
-    db.delete(db_banner)
-    db.commit()
+@router.delete("/banners/{bid}")
+def admin_delete_banner(bid: int, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    db_b = db.query(models.Banner).filter(models.Banner.id == bid).first()
+    if not db_b: raise HTTPException(404, "轮播图不存在")
+    db.delete(db_b); db.commit()
     return {"message": "删除成功"}
+
+
+# --- Downloads ---
+@router.get("/downloads")
+def admin_list_downloads(db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    return db.query(models.Download).order_by(models.Download.sort_order).all()
+
+
+@router.post("/downloads", response_model=schemas.DownloadOut)
+def admin_create_download(download: schemas.DownloadCreate, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    db_d = models.Download(**download.model_dump())
+    db.add(db_d); db.commit(); db.refresh(db_d)
+    return db_d
+
+
+@router.put("/downloads/{did}", response_model=schemas.DownloadOut)
+def admin_update_download(did: int, download: schemas.DownloadCreate, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    db_d = db.query(models.Download).filter(models.Download.id == did).first()
+    if not db_d: raise HTTPException(404, "下载项不存在")
+    for k, v in download.model_dump().items():
+        setattr(db_d, k, v)
+    db.commit(); db.refresh(db_d)
+    return db_d
+
+
+@router.delete("/downloads/{did}")
+def admin_delete_download(did: int, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    db_d = db.query(models.Download).filter(models.Download.id == did).first()
+    if not db_d: raise HTTPException(404, "下载项不存在")
+    db.delete(db_d); db.commit()
+    return {"message": "删除成功"}
+
+
+# --- Manuals ---
+@router.get("/manuals")
+def admin_list_manuals(db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    return db.query(models.Manual).order_by(models.Manual.sort_order).all()
+
+
+@router.post("/manuals", response_model=schemas.ManualOut)
+def admin_create_manual(manual: schemas.ManualCreate, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    db_m = models.Manual(**manual.model_dump())
+    db.add(db_m); db.commit(); db.refresh(db_m)
+    return db_m
+
+
+@router.put("/manuals/{mid}", response_model=schemas.ManualOut)
+def admin_update_manual(mid: int, manual: schemas.ManualCreate, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    db_m = db.query(models.Manual).filter(models.Manual.id == mid).first()
+    if not db_m: raise HTTPException(404, "说明书不存在")
+    for k, v in manual.model_dump().items():
+        setattr(db_m, k, v)
+    db.commit(); db.refresh(db_m)
+    return db_m
+
+
+@router.delete("/manuals/{mid}")
+def admin_delete_manual(mid: int, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    db_m = db.query(models.Manual).filter(models.Manual.id == mid).first()
+    if not db_m: raise HTTPException(404, "说明书不存在")
+    db.delete(db_m); db.commit()
+    return {"message": "删除成功"}
+
+
+# --- Page Content ---
+@router.get("/pages")
+def admin_list_pages(db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    return db.query(models.PageContent).all()
+
+
+@router.put("/pages/{page_key}")
+def admin_upsert_page(page_key: str, data: schemas.PageContentCreate, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    page = db.query(models.PageContent).filter(models.PageContent.page_key == page_key).first()
+    if page:
+        page.title = data.title
+        page.content = data.content
+        page.images = data.images
+    else:
+        page = models.PageContent(**data.model_dump())
+        db.add(page)
+    db.commit()
+    return {"message": "保存成功"}
+
+
+# --- Users ---
+@router.get("/users")
+def admin_list_users(
+    page: int = Query(1), page_size: int = Query(20),
+    keyword: Optional[str] = None,
+    db: Session = Depends(get_db), admin=Depends(get_current_admin)
+):
+    query = db.query(models.User).filter(models.User.role == "user")
+    if keyword:
+        query = query.filter(models.User.username.contains(keyword) | models.User.email.contains(keyword))
+    total = query.count()
+    users = query.order_by(models.User.created_at.desc()).offset((page-1)*page_size).limit(page_size).all()
+    return {"total": total, "items": users}
+
+
+@router.put("/users/{uid}/status")
+def admin_toggle_user(uid: int, data: dict, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    user = db.query(models.User).filter(models.User.id == uid).first()
+    if not user: raise HTTPException(404, "用户不存在")
+    user.is_active = data.get("is_active", user.is_active)
+    db.commit()
+    return {"message": "更新成功"}

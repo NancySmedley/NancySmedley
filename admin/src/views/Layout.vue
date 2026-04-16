@@ -3,7 +3,7 @@
     <!-- Sidebar -->
     <aside class="admin-sidebar">
       <div class="sidebar-logo">
-        i<span>K</span>F
+        <span>ShineSphere</span>
         <small>管理后台</small>
       </div>
       <nav class="sidebar-menu">
@@ -21,14 +21,22 @@
         </router-link>
 
         <div class="menu-section">运营</div>
-        <router-link to="/admin/orders" :class="['menu-item', { active: $route.path === '/admin/orders' }]">
-          <el-icon><List /></el-icon> 订单管理
-        </router-link>
-        <router-link to="/admin/users" :class="['menu-item', { active: $route.path === '/admin/users' }]">
-          <el-icon><User /></el-icon> 用户管理
-        </router-link>
         <router-link to="/admin/banners" :class="['menu-item', { active: $route.path === '/admin/banners' }]">
           <el-icon><Picture /></el-icon> 轮播图管理
+        </router-link>
+        <router-link to="/admin/downloads" :class="['menu-item', { active: $route.path === '/admin/downloads' }]">
+          <el-icon><Download /></el-icon> 软件下载
+        </router-link>
+        <router-link to="/admin/manuals" :class="['menu-item', { active: $route.path === '/admin/manuals' }]">
+          <el-icon><Document /></el-icon> 产品说明书
+        </router-link>
+        <router-link to="/admin/pages" :class="['menu-item', { active: $route.path === '/admin/pages' }]">
+          <el-icon><Edit /></el-icon> 页面内容
+        </router-link>
+
+        <div class="menu-section">用户</div>
+        <router-link to="/admin/users" :class="['menu-item', { active: $route.path === '/admin/users' }]">
+          <el-icon><User /></el-icon> 用户管理
         </router-link>
       </nav>
     </aside>
@@ -38,7 +46,7 @@
       <header class="admin-header">
         <span class="header-title">{{ routeTitle }}</span>
         <div class="header-actions">
-          <el-button link @click="() => window.open('/', '_blank')">
+          <el-button link @click="() => globalThis.open('/', '_blank')">
             <el-icon><Monitor /></el-icon> 前台预览
           </el-button>
           <el-dropdown @command="handleCmd">
@@ -78,9 +86,11 @@ const titleMap = {
   '/admin/dashboard': '数据概览',
   '/admin/products': '商品管理',
   '/admin/categories': '分类管理',
-  '/admin/orders': '订单管理',
-  '/admin/users': '用户管理',
   '/admin/banners': '轮播图管理',
+  '/admin/downloads': '软件下载',
+  '/admin/manuals': '产品说明书',
+  '/admin/pages': '页面内容',
+  '/admin/users': '用户管理',
 }
 
 const routeTitle = computed(() => titleMap[route.path] || '管理后台')
@@ -92,6 +102,4 @@ function handleCmd(cmd) {
     router.push('/admin/login')
   }
 }
-
-const window = globalThis
 </script>

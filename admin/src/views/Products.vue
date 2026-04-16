@@ -6,7 +6,7 @@
     </div>
 
     <!-- Filters -->
-    <div style="display:flex;gap:12px;margin-bottom:16px">
+    <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">
       <el-input v-model="filters.keyword" placeholder="搜索商品名称" style="width:220px" clearable @change="fetchProducts" />
       <el-select v-model="filters.category_id" placeholder="分类筛选" clearable style="width:160px" @change="fetchProducts">
         <el-option v-for="c in categories" :key="c.id" :label="c.name" :value="c.id" />
@@ -22,21 +22,17 @@
         </template>
       </el-table-column>
       <el-table-column prop="name" label="商品名称" min-width="180" show-overflow-tooltip />
-      <el-table-column label="价格" width="100">
+      <el-table-column prop="series" label="系列" width="120" show-overflow-tooltip />
+      <el-table-column label="标签" width="150">
         <template #default="{ row }">
-          <span style="color:var(--accent);font-weight:600">¥{{ row.price }}</span>
+          <el-tag v-if="row.is_featured" size="small" type="warning" style="margin-right:4px">精选</el-tag>
+          <el-tag v-if="row.is_lifestyle" size="small" type="success" style="margin-right:4px">运动</el-tag>
+          <el-tag v-if="row.is_fashion" size="small" type="info">穿搭</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="stock" label="库存" width="80" />
-      <el-table-column prop="sales" label="销量" width="80" />
       <el-table-column label="状态" width="80">
         <template #default="{ row }">
           <el-tag :type="row.is_active ? 'success' : 'info'" size="small">{{ row.is_active ? '上架' : '下架' }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="精选" width="80">
-        <template #default="{ row }">
-          <el-tag :type="row.is_featured ? 'warning' : 'info'" size="small">{{ row.is_featured ? '是' : '否' }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="140" fixed="right">
@@ -55,8 +51,8 @@
     </div>
 
     <!-- Dialog -->
-    <el-dialog v-model="showDialog" :title="editId ? '编辑商品' : '添加商品'" width="680px" top="5vh">
-      <el-form :model="form" label-width="90px">
+    <el-dialog v-model="showDialog" :title="editId ? '编辑商品' : '添加商品'" width="700px" top="5vh">
+      <el-form :model="form" label-width="100px">
         <el-row :gutter="16">
           <el-col :span="16">
             <el-form-item label="商品名称"><el-input v-model="form.name" /></el-form-item>
@@ -69,20 +65,24 @@
             </el-form-item>
           </el-col>
         </el-row>
-        <el-form-item label="商品描述">
-          <el-input v-model="form.description" type="textarea" :rows="3" />
-        </el-form-item>
         <el-row :gutter="16">
-          <el-col :span="8">
-            <el-form-item label="售价（¥）"><el-input-number v-model="form.price" :min="0" :precision="2" style="width:100%" /></el-form-item>
+          <el-col :span="12">
+            <el-form-item label="系列">
+              <el-input v-model="form.series" placeholder="如：复古系列、蓝牙系列" />
+            </el-form-item>
           </el-col>
-          <el-col :span="8">
-            <el-form-item label="原价（¥）"><el-input-number v-model="form.original_price" :min="0" :precision="2" style="width:100%" /></el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="库存"><el-input-number v-model="form.stock" :min="0" style="width:100%" /></el-form-item>
+          <el-col :span="12">
+            <el-form-item label="外部购买链接">
+              <el-input v-model="form.external_link" placeholder="天猫/京东等链接" />
+            </el-form-item>
           </el-col>
         </el-row>
+        <el-form-item label="简短描述">
+          <el-input v-model="form.short_desc" placeholder="首页展示的简短卖点描述" />
+        </el-form-item>
+        <el-form-item label="商品详情">
+          <el-input v-model="form.description" type="textarea" :rows="3" />
+        </el-form-item>
         <el-form-item label="封面图片">
           <div style="display:flex;gap:12px;align-items:center">
             <el-input v-model="form.cover_image" placeholder="图片URL 或上传" style="flex:1" />
@@ -92,8 +92,8 @@
           </div>
           <el-image v-if="form.cover_image" :src="form.cover_image" style="width:80px;height:80px;border-radius:6px;margin-top:8px;object-fit:cover" />
         </el-form-item>
-        <el-form-item label="规格参数">
-          <el-input v-model="form.specs" type="textarea" :rows="3" placeholder='JSON格式，如: {"品牌":"iKF","续航":"8小时"}' />
+        <el-form-item label="颜色（JSON）">
+          <el-input v-model="form.colors" placeholder='如: ["#ff0000","#000000","#ffffff"]' />
         </el-form-item>
         <el-row :gutter="16">
           <el-col :span="6">
@@ -102,10 +102,16 @@
           <el-col :span="6">
             <el-form-item label="精选推荐"><el-switch v-model="form.is_featured" /></el-form-item>
           </el-col>
-          <el-col :span="12">
-            <el-form-item label="排序权重"><el-input-number v-model="form.sort_order" style="width:100%" /></el-form-item>
+          <el-col :span="6">
+            <el-form-item label="运动生活"><el-switch v-model="form.is_lifestyle" /></el-form-item>
+          </el-col>
+          <el-col :span="6">
+            <el-form-item label="穿搭好物"><el-switch v-model="form.is_fashion" /></el-form-item>
           </el-col>
         </el-row>
+        <el-form-item label="排序权重">
+          <el-input-number v-model="form.sort_order" style="width:200px" />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showDialog = false">取消</el-button>
@@ -135,9 +141,10 @@ const form = ref(defaultForm())
 
 function defaultForm() {
   return {
-    name: '', description: '', price: 0, original_price: null, stock: 0,
-    cover_image: '', images: '', specs: '', category_id: null,
-    is_active: true, is_featured: false, sort_order: 0
+    name: '', description: '', short_desc: '', series: '', external_link: '',
+    cover_image: '', images: '', colors: '', specs: '', category_id: null,
+    is_active: true, is_featured: false, is_lifestyle: false, is_fashion: false,
+    sort_order: 0
   }
 }
 
@@ -168,7 +175,7 @@ function openDialog(row = null) {
 }
 
 async function saveProduct() {
-  if (!form.value.name || form.value.price == null) return ElMessage.warning('请填写商品名称和价格')
+  if (!form.value.name) return ElMessage.warning('请填写商品名称')
   saving.value = true
   try {
     if (editId.value) {

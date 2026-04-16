@@ -1,231 +1,154 @@
 <template>
   <div>
-    <!-- Banner -->
-    <div class="banner-section" v-if="banners.length">
-      <div class="banner-swiper">
-        <div class="banner-slide" :style="{ display: currentBanner === i ? 'block' : 'none' }"
-          v-for="(b, i) in banners" :key="b.id">
-          <img :src="b.image" :alt="b.title" />
-          <div class="banner-overlay">
-            <div class="banner-text">
-              <h2>{{ b.title }}</h2>
-              <p>探索 iKF 年度最佳音频产品</p>
-              <el-button type="primary" size="large" round @click="$router.push('/products')">
-                立即选购
-              </el-button>
-            </div>
+    <!-- Hero Banner -->
+    <div class="hero-banner" v-if="banners.length">
+      <div
+        v-for="(b, i) in banners" :key="b.id"
+        class="hero-slide"
+        :class="{ active: current === i, hidden: current !== i }"
+        :style="{ background: b.bg_color }"
+      >
+        <div class="hero-content">
+          <div class="hero-tag">{{ b.title }}</div>
+          <h1 class="hero-title">{{ b.subtitle }}</h1>
+          <div class="hero-features" v-if="parseFeatures(b.features).length">
+            <span v-for="f in parseFeatures(b.features)" :key="f">{{ f }}</span>
+          </div>
+          <div class="hero-btns">
+            <button class="btn-new">新品上市</button>
+            <button class="btn-buy" @click="openLink(b.link)">{{ b.btn_text || '立即购买' }}</button>
           </div>
         </div>
+        <img class="hero-image" :src="b.image" :alt="b.title" />
       </div>
-      <!-- dots -->
-      <div class="banner-dots">
-        <span v-for="(b, i) in banners" :key="i"
-          :class="['dot', { active: currentBanner === i }]"
-          @click="currentBanner = i" />
-      </div>
-    </div>
-    <div v-else class="default-banner">
-      <div class="container">
-        <div class="banner-text" style="max-width:600px;padding:80px 0">
-          <h2>只做有趣的音乐产品</h2>
-          <p>用先锋设计与前沿科技，点燃对音乐的热爱</p>
-          <el-button type="primary" size="large" round @click="$router.push('/products')">探索产品</el-button>
-        </div>
-      </div>
-    </div>
 
-    <!-- Categories -->
-    <div class="container" style="margin-top:48px">
-      <h2 class="section-title">产品系列</h2>
-      <div class="category-tabs">
+      <div class="hero-dots">
         <div
-          v-for="cat in categories" :key="cat.id"
-          class="category-tab"
-          @click="$router.push(`/products?category_id=${cat.id}`)"
+          v-for="(b, i) in banners" :key="i"
+          class="hero-dot" :class="{ active: current === i }"
+          @click="current = i"
+        />
+      </div>
+    </div>
+
+    <!-- Hot Sale -->
+    <div v-if="featuredProducts.length">
+      <div class="section-header">
+        <div class="section-en">iKF ACE HOT SALE</div>
+        <div class="section-zh">iKF 主销爆款</div>
+      </div>
+      <div class="hot-sale-list">
+        <div
+          v-for="(p, i) in featuredProducts" :key="p.id"
+          class="hot-item" :class="{ reverse: i % 2 === 1 }"
         >
-          <div class="cat-icon">{{ cat.icon || '🎧' }}</div>
-          <span>{{ cat.name }}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Featured Products -->
-    <div class="container" style="margin-top:48px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
-        <h2 class="section-title" style="margin-bottom:0">精选推荐</h2>
-        <router-link to="/products" style="color:var(--accent);font-size:14px">查看全部 →</router-link>
-      </div>
-      <div v-if="loading" class="products-grid">
-        <el-skeleton v-for="i in 4" :key="i" style="border-radius:12px" animated>
-          <template #template>
-            <el-skeleton-item variant="image" style="height:220px" />
-            <div style="padding:14px">
-              <el-skeleton-item variant="p" style="width:100%" />
-              <el-skeleton-item variant="p" style="width:60%;margin-top:8px" />
+          <div class="hot-img-wrap">
+            <img :src="p.cover_image" :alt="p.name" />
+          </div>
+          <div class="hot-info">
+            <div class="hot-name">
+              {{ p.name }}
+              <span class="hot-badge" v-if="i === 0">新品</span>
             </div>
-          </template>
-        </el-skeleton>
-      </div>
-      <div v-else class="products-grid">
-        <ProductCard v-for="p in featuredProducts" :key="p.id" :product="p" />
-      </div>
-    </div>
-
-    <!-- All New Products -->
-    <div class="container" style="margin-top:48px;margin-bottom:60px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
-        <h2 class="section-title" style="margin-bottom:0">最新上架</h2>
-        <router-link to="/products" style="color:var(--accent);font-size:14px">查看全部 →</router-link>
-      </div>
-      <div class="products-grid">
-        <ProductCard v-for="p in newProducts" :key="p.id" :product="p" />
-      </div>
-    </div>
-
-    <!-- Brand Values -->
-    <div style="background:var(--primary);color:white;padding:60px 0">
-      <div class="container">
-        <h2 style="text-align:center;margin-bottom:40px;font-size:24px">为什么选择 iKF</h2>
-        <div class="values-grid">
-          <div class="value-item" v-for="v in values" :key="v.title">
-            <div class="value-icon">{{ v.icon }}</div>
-            <h3>{{ v.title }}</h3>
-            <p>{{ v.desc }}</p>
+            <div class="hot-desc">{{ p.short_desc }}</div>
+            <div class="hot-colors" v-if="parseColors(p.colors).length">
+              <div
+                v-for="c in parseColors(p.colors)" :key="c"
+                class="color-dot" :style="{ background: c }"
+              />
+            </div>
+            <a class="link-buy" :href="p.external_link || '#'" target="_blank">立即购买</a>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Born for Movement -->
+    <div v-if="lifestyleProducts.length">
+      <div class="section-header">
+        <div class="section-en">BORN FOR MOVEMENT</div>
+        <div class="section-zh">为运动而生</div>
+      </div>
+      <div class="lifestyle-section">
+        <div v-for="p in lifestyleProducts" :key="p.id" class="lifestyle-item">
+          <img :src="p.cover_image" :alt="p.name" />
+          <div class="lifestyle-overlay">
+            <div class="lifestyle-name">{{ p.name }}</div>
+            <div class="lifestyle-desc">{{ p.short_desc }}</div>
+            <a class="link-buy" style="color:white" :href="p.external_link || '#'" target="_blank">立即购买</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fashion -->
+    <div v-if="fashionProducts.length" class="container fashion-section">
+      <div class="fashion-title">穿搭好物</div>
+      <div class="fashion-grid">
+        <div
+          v-for="p in fashionProducts" :key="p.id"
+          class="fashion-card"
+          @click="openLink(p.external_link)"
+        >
+          <img :src="p.cover_image" :alt="p.name" />
+          <div class="fashion-card-info">
+            <div class="fashion-card-name">{{ p.name }}</div>
+            <div class="fashion-card-desc">{{ p.short_desc }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scroll to top -->
+    <div class="scroll-top" @click="scrollTop">↑</div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { productApi } from '@/api'
-import ProductCard from '@/components/ProductCard.vue'
 
 const banners = ref([])
-const categories = ref([])
 const featuredProducts = ref([])
-const newProducts = ref([])
-const loading = ref(true)
-const currentBanner = ref(0)
+const lifestyleProducts = ref([])
+const fashionProducts = ref([])
+const current = ref(0)
+let timer = null
 
-let bannerTimer = null
+function parseFeatures(str) {
+  try { return JSON.parse(str || '[]') } catch { return [] }
+}
 
-const values = [
-  { icon: '🎵', title: '专业音质', desc: '每款产品均经过专业调音师精心调校，还原最真实的音乐' },
-  { icon: '🔋', title: '超长续航', desc: '先进电池技术，单次充电享受全天候音乐体验' },
-  { icon: '🛡️', title: '品质保障', desc: '严格质量管控，每款产品出厂前经过100+项测试' },
-  { icon: '🚀', title: '极速发货', desc: '下单后24小时内发货，支持顺丰闪送' },
-]
+function parseColors(str) {
+  try { return JSON.parse(str || '[]') } catch { return [] }
+}
+
+function openLink(url) {
+  if (url) window.open(url, '_blank')
+}
+
+function scrollTop() {
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
 
 onMounted(async () => {
-  const [bannersRes, catsRes] = await Promise.all([
+  const [bannersRes, featuredRes, lifestyleRes, fashionRes] = await Promise.all([
     productApi.banners(),
-    productApi.categories(),
+    productApi.list({ featured: true, page_size: 6 }),
+    productApi.list({ lifestyle: true, page_size: 4 }),
+    productApi.list({ fashion: true, page_size: 3 }),
   ])
   banners.value = bannersRes
-  categories.value = catsRes
+  featuredProducts.value = featuredRes.items
+  lifestyleProducts.value = lifestyleRes.items
+  fashionProducts.value = fashionRes.items
 
   if (banners.value.length > 1) {
-    bannerTimer = setInterval(() => {
-      currentBanner.value = (currentBanner.value + 1) % banners.value.length
-    }, 4000)
+    timer = setInterval(() => {
+      current.value = (current.value + 1) % banners.value.length
+    }, 5000)
   }
-
-  const [featuredRes, newRes] = await Promise.all([
-    productApi.list({ featured: true, page_size: 4 }),
-    productApi.list({ page_size: 8 }),
-  ])
-  featuredProducts.value = featuredRes.items
-  newProducts.value = newRes.items
-  loading.value = false
 })
 
-onUnmounted(() => {
-  if (bannerTimer) clearInterval(bannerTimer)
-})
+onUnmounted(() => { if (timer) clearInterval(timer) })
 </script>
-
-<style scoped>
-.default-banner {
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-  color: white;
-}
-
-.banner-section { position: relative; }
-
-.banner-dots {
-  position: absolute;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 8px;
-}
-
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.5);
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.dot.active { background: white; width: 24px; border-radius: 4px; }
-
-.category-tabs {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 16px;
-}
-
-.category-tab {
-  background: white;
-  border-radius: 12px;
-  padding: 24px 16px;
-  text-align: center;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-  transition: all 0.2s;
-}
-
-.category-tab:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
-  color: var(--accent);
-}
-
-.cat-icon {
-  font-size: 36px;
-  margin-bottom: 10px;
-}
-
-.category-tab span {
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.values-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 32px;
-  text-align: center;
-}
-
-.value-icon { font-size: 40px; margin-bottom: 16px; }
-
-.value-item h3 { font-size: 16px; margin-bottom: 8px; }
-
-.value-item p {
-  font-size: 13px;
-  color: rgba(255,255,255,0.7);
-  line-height: 1.6;
-}
-
-@media (max-width: 768px) {
-  .category-tabs { grid-template-columns: repeat(3, 1fr); }
-  .values-grid { grid-template-columns: repeat(2, 1fr); gap: 20px; }
-}
-</style>

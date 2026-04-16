@@ -3,59 +3,66 @@
     <!-- Stat Cards -->
     <div class="stat-cards" v-loading="loading">
       <div class="stat-card">
-        <div class="stat-icon" style="background:#e6f4ff">👥</div>
+        <div class="stat-icon" style="background:#e6f4ff">🎧</div>
         <div class="stat-info">
-          <div class="value" style="color:#1890ff">{{ stats.total_users }}</div>
-          <div class="label">注册用户</div>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon" style="background:#fff7e6">🎧</div>
-        <div class="stat-info">
-          <div class="value" style="color:#fa8c16">{{ stats.total_products }}</div>
+          <div class="value" style="color:#1890ff">{{ stats.total_products }}</div>
           <div class="label">商品总数</div>
         </div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon" style="background:#f6ffed">📦</div>
+        <div class="stat-icon" style="background:#fff7e6">📱</div>
         <div class="stat-info">
-          <div class="value" style="color:#52c41a">{{ stats.total_orders }}</div>
-          <div class="label">订单总数</div>
+          <div class="value" style="color:#fa8c16">{{ stats.total_downloads }}</div>
+          <div class="label">软件下载</div>
         </div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon" style="background:#fff0f0">💰</div>
+        <div class="stat-icon" style="background:#f6ffed">📄</div>
         <div class="stat-info">
-          <div class="value" style="color:#e94560">¥{{ stats.total_revenue?.toFixed(2) }}</div>
-          <div class="label">累计收入</div>
+          <div class="value" style="color:#52c41a">{{ stats.total_manuals }}</div>
+          <div class="label">说明书数量</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#fff0f0">👥</div>
+        <div class="stat-info">
+          <div class="value" style="color:#e94560">{{ stats.total_users }}</div>
+          <div class="label">注册用户</div>
         </div>
       </div>
     </div>
 
-    <!-- Recent Orders -->
-    <div class="page-card">
+    <!-- Quick Links -->
+    <div class="page-card" style="margin-top:24px">
       <div class="page-card-header">
-        <span class="page-card-title">最近订单</span>
-        <router-link to="/admin/orders">
-          <el-button link type="primary">查看全部</el-button>
+        <span class="page-card-title">快捷入口</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;padding:8px 0">
+        <router-link to="/admin/products" style="text-decoration:none">
+          <div style="padding:20px;background:#f5f5f5;border-radius:8px;text-align:center;cursor:pointer;transition:background .2s">
+            <div style="font-size:28px;margin-bottom:8px">🎧</div>
+            <div style="font-size:13px;color:#333">商品管理</div>
+          </div>
+        </router-link>
+        <router-link to="/admin/banners" style="text-decoration:none">
+          <div style="padding:20px;background:#f5f5f5;border-radius:8px;text-align:center;cursor:pointer">
+            <div style="font-size:28px;margin-bottom:8px">🖼️</div>
+            <div style="font-size:13px;color:#333">轮播图管理</div>
+          </div>
+        </router-link>
+        <router-link to="/admin/downloads" style="text-decoration:none">
+          <div style="padding:20px;background:#f5f5f5;border-radius:8px;text-align:center;cursor:pointer">
+            <div style="font-size:28px;margin-bottom:8px">📱</div>
+            <div style="font-size:13px;color:#333">软件下载</div>
+          </div>
+        </router-link>
+        <router-link to="/admin/pages" style="text-decoration:none">
+          <div style="padding:20px;background:#f5f5f5;border-radius:8px;text-align:center;cursor:pointer">
+            <div style="font-size:28px;margin-bottom:8px">📝</div>
+            <div style="font-size:13px;color:#333">页面内容</div>
+          </div>
         </router-link>
       </div>
-      <el-table :data="stats.recent_orders || []" stripe>
-        <el-table-column prop="order_no" label="订单号" width="200" />
-        <el-table-column prop="total_amount" label="金额" width="120">
-          <template #default="{ row }">
-            <span style="color:var(--accent);font-weight:600">¥{{ row.total_amount?.toFixed(2) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="status" label="状态" width="100">
-          <template #default="{ row }">
-            <el-tag :type="statusType(row.status)" size="small">{{ statusLabel(row.status) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="created_at" label="下单时间">
-          <template #default="{ row }">{{ new Date(row.created_at).toLocaleString('zh-CN') }}</template>
-        </el-table-column>
-      </el-table>
     </div>
   </div>
 </template>
@@ -64,11 +71,8 @@
 import { ref, onMounted } from 'vue'
 import { adminApi } from '@/api'
 
-const stats = ref({ total_users: 0, total_products: 0, total_orders: 0, total_revenue: 0, recent_orders: [] })
+const stats = ref({ total_products: 0, total_downloads: 0, total_manuals: 0, total_users: 0 })
 const loading = ref(true)
-
-const statusLabel = s => ({ pending: '待支付', paid: '已支付', shipped: '已发货', delivered: '已完成', cancelled: '已取消' }[s] || s)
-const statusType = s => ({ pending: 'warning', paid: 'primary', shipped: '', delivered: 'success', cancelled: 'info' }[s] || '')
 
 onMounted(async () => {
   stats.value = await adminApi.stats()
